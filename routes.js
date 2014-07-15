@@ -22,7 +22,8 @@ module.exports = function(app,io){
 	});
 
 	app.get('/test', function(req, res) {
-		var azureServiceBus = azure.createServiceBusService('dwx2014chat', 'RCaitDJs88rhMgKrSBmZhzPU9jS9xSwz7+X80LSODTY=');
+		// Grab connection informations from environment
+		var azureServiceBus = azure.createServiceBusService();
 	    azureServiceBus.sendTopicMessage('default', 'test', function(err) {
 	        if (err) {
 		    console.log(process.pid + " - " + 'sendTopicMessage failed: ' + JSON.stringify(err));
