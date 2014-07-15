@@ -1,0 +1,7 @@
+.DS_Store
+.vagrant/
+acc.publishsettings
+puphpet/
+Vagrantfile
+azure.err
+node_modules/
