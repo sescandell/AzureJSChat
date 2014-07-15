@@ -16,4 +16,14 @@ module.exports = function(app, io){
 
 	// Make the files in the public folder available to the world
 	app.use(express.static(__dirname + '/public'));
+
+	// Add azure adapter if required
+	if (false && process.env.hasOwnProperty('WEBSITE_INSTANCE_ID')) {
+		console.log('Loading Azure adapter');
+		var azureAdapter = require(__dirname + '/lib/socketio-azuresb/index.js');
+		console.log('Attaching Azure adapter');
+		io.adapter(azureAdapter({subscriptionId: process.env.WEBSITE_INSTANCE_ID}));
+	} else {
+		console.log('This is not Azure, use classic mechanism.');
+	}
 };
