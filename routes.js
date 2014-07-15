@@ -5,45 +5,16 @@
 // Use the gravatar module, to turn email addresses into avatar images:
 
 var gravatar = require('gravatar');
-
-
-
-var azure = require('azure');
-
+var azureStorage = require('azure-storage');
 
 // Export a function, so that we can pass 
 // the app and io instances from the app.js file:
 
-module.exports = function(app,io){
+module.exports = function(app, io){
 
 	app.get('/', function(req, res){
 		// Render views/home.html
 		res.render('home');
-	});
-
-	app.get('/test', function(req, res) {
-		var azureServiceBus = azure.createServiceBusService('dwx2014chat', 'RCaitDJs88rhMgKrSBmZhzPU9jS9xSwz7+X80LSODTY=');
-	    azureServiceBus.sendTopicMessage('default', 'test', function(err) {
-	        if (err) {
-		    console.log(process.pid + " - " + 'sendTopicMessage failed: ' + JSON.stringify(err));
-		} else {
-	            console.log('Sent!!!');
-	            console.log('Retrieving message');
-	            azureServiceBus.receiveSubscriptionMessage('default', 'my_subscription', function(err, receivedMessage) {
-	                if (err) {
-	                    if (err !== 'No messages to receive') {
-	                        console.log(process.pid + " - " + 'Error receiving message: ' + JSON.stringify(err));
-	                    }
-	                    console.log(process.pid + " - " + err);
-			}
-
-	                if (receivedMessage) {
-	                    console.log(process.pid + " - " + 'Brut: ' + receivedMessage);
-	                }
-	                console.log('Received');
-	            });
-	        }
-	    });
 	});
 
 	app.get('/create', function(req,res){
@@ -58,19 +29,90 @@ module.exports = function(app,io){
 		res.render('chat');
 	});
 
-	var participants = {};
+
+	// Quick and dirty... just for tutorial purposes.
+	// You should better to rely on a service for that
+	// Use Azure Table Storage service to store users list.
+	var ParticipantTableStorage = function () {
+		var azureTableService = azureStorage.createTableService();
+		var entGen = azureStorage.TableUtilities.entityGenerator;
+		var tableName = 'participants';
+		var partitionKey = "default";
+		var prefix = process.env.WEBSITE_INSTANCE_ID || 'default';
+
+		// If this is the first time the application is launched, let's create the table
+		azureTableService.createTableIfNotExists(tableName, function (err, result, response){
+			if (err) {
+				console.log('Error on create table: ', err);
+
+				throw err;
+			}
+		}.bind(this));
+
+		return {
+			// Retrieve participants count from Store
+			// We retrieve all participants to show you how to get a users' list
+			getCount: function(room, callback) {
+				var query = new azureStorage.TableQuery()
+					.where('PartitionKey eq ?', partitionKey + room);
+
+				azureTableService.queryEntities(tableName, query, null, function(err, result, response){
+					if (err) {
+						console.log('Retrieving participants failed: ' + JSON.stringify(err));
+						
+						callback(err, undefined);
+					}
+
+					callback(undefined, result.entries.length);
+				}.bind(this))
+			},
+
+			// Add a new participant to the store
+			add: function(participant) {
+				var entity = {
+					PartitionKey: entGen.String(partitionKey + participant.room),
+					RowKey: entGen.String(prefix + participant.id),
+					username: entGen.String(participant.username),
+					avatar: entGen.String(participant.avatar),
+					room: entGen.String(participant.room)
+				};
+
+				azureTableService.insertEntity(tableName, entity, function(err, result, response){
+					if (err) {
+						console.log('Error inserting participant ');
+					}
+				}.bind(this));
+			},
+
+			// Remove a participant from the store
+			remove: function(participant) {
+				var entity = {
+					PartitionKey: entGen.String(partitionKey + participant.room),
+					RowKey: entGen.String(prefix + participant.id)
+				};
+
+				azureTableService.deleteEntity(tableName, entity, function(err, response){
+					if (err) {
+						console.log('Error deleting entity');
+					}
+					console.log('Deleted!');
+				}.bind(this));
+			}
+		};
+	};
+	var participantStorage = new ParticipantTableStorage();
+
 
 	// Initialize a new socket.io application, named 'chat'
 	var chat = io.of('/socket').on('connection', function (socket) {
-
 		// When the client emits the 'load' event, reply with the 
 		// number of people in this chat room
 		socket.on('load',function(room){
 			// Get clients count
-			var clientsCount = Object.keys(participants).length;
-
-			console.log('Someone loaded room ' + room + '. Already ' + clientsCount + ' participants.');
-			socket.emit('peopleInChat', {number: clientsCount});
+			participantStorage.getCount(room, function(err, clientsCount){
+				console.log('Someone loaded room ' + room + '. Already ' + clientsCount + ' participants.');
+				socket.emit('peopleInChat', {number: clientsCount});
+			}.bind(this));
 		});
 
 		// When the client emits 'login', save his name and avatar,
@@ -90,15 +132,15 @@ module.exports = function(app,io){
 			console.log('New participant to the room ' + socket.room + ': ' + socket.username + ' (' + socket.avatar + ')');
 
 			// Store the client to the store
-			participants[socket.id] = {
+			participantStorage.add({
 				id: socket.id,
 				username: socket.username,
 				avatar: socket.avatar,
 				room: socket.room
-			};
+			});
 
 			// Notify participants
-			socket.to(data.id).emit('participantJoined', {
+			socket.to(socket.room).emit('participantJoined', {
 				username: socket.username,
 				avatar: socket.avatar,
 				room: socket.room
@@ -107,7 +149,9 @@ module.exports = function(app,io){
 
 		// Somebody left the chat
 		socket.on('disconnect', function() {
+			console.log('Disconnect received');
 			if (socket.username) {
+				console.log('Participant ' + socket.username + ' leaved the room ' + socket.room);
 				// Notify others in the chat room
 				socket.to(socket.room).emit('participantLeaved', {
 					room: socket.room,
@@ -116,7 +160,15 @@ module.exports = function(app,io){
 				});
 
 				// Remove the client from store
-				delete participants[socket.id];	
+				participantStorage.remove({
+					id: socket.id,
+					room: socket.room,
+					username: socket.username,
+					avatar: socket.avatar
+				});
+
+				// leave the room
+				socket.leave(socket.room);
 			}
 		});
 

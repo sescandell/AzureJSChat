@@ -1,5 +1,5 @@
 {
-  "name": "NodeChatSystem",
+  "name": "AureJSChat",
   "version": "0.0.1",
   "description": "Realtime chat system for DWX 2014 - Brainsonic - Based on Tutorialzine.com project",
   "main": "app.js",
@@ -13,16 +13,19 @@
   ],
   "author": "Brainsonic",
   "contributors": [
-      "Nikolay Anastasov",
-      "Stéphane Escandell <stephane.escandell@gmail.com>"
+    "Nikolay Anastasov",
+    "Stéphane Escandell <stephane.escandell@gmail.com>"
   ],
   "license": "MIT",
   "dependencies": {
     "azure": "^0.9.11",
+    "azure-storage": "^0.3.0",
     "ejs": "~0.8.5",
     "express": "~3.5.0",
     "gravatar": "~1.0.6",
+    "msgpack-js": "0.3.0",
+    "redis": "0.10.1",
     "socket.io": "~1.0.2",
-    "socket.io-adapter": "^0.3.0"
+    "socket.io-redis": "~0.1.0"
   }
 }

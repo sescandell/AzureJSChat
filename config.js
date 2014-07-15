@@ -2,6 +2,7 @@
 // It is required by app.js
 
 var express = require('express');
+var redis = require('redis').createClient;
 
 module.exports = function(app, io){
 
@@ -18,12 +19,35 @@ module.exports = function(app, io){
 	app.use(express.static(__dirname + '/public'));
 
 	// Add azure adapter if required
-	if (false && process.env.hasOwnProperty('WEBSITE_INSTANCE_ID')) {
-		console.log('Loading Azure adapter');
-		var azureAdapter = require(__dirname + '/lib/socketio-azuresb/index.js');
-		console.log('Attaching Azure adapter');
-		io.adapter(azureAdapter({subscriptionId: process.env.WEBSITE_INSTANCE_ID}));
+	if (process.env.hasOwnProperty('REDIS_HOST') && process.env.hasOwnProperty('REDIS_PORT') && process.env.hasOwnProperty('REDIS_AUTH_PASS')) {
+		console.log('Loading Redis adapter');
+		var redisAdapter = require('socket.io-redis');
+		console.log('Creating Redis clients');
+		// We need to manually create Redis Client because, on Azure, Redis
+		// requires Authentication (default socket.io-redis process doesn't permit
+		// this by options). So let's create them manually
+		// Publisher
+		var redisClientPub = redis(
+			process.env.REDIS_PORT
+			, process.env.REDIS_HOST
+			, {auth_pass: process.env.REDIS_AUTH_PASS}
+		);
+		// Subscriber
+		var redisClientSub = redis(
+			process.env.REDIS_PORT
+			, process.env.REDIS_HOST
+			, {
+				auth_pass: process.env.REDIS_AUTH_PASS,
+				detect_buffers: true
+			}
+		);
+		console.log('Attaching Redis Adapter');
+		io.adapter(redisAdapter({
+			pubClient: redisClientPub,
+			subClient: redisClientSub
+		}));
 	} else {
-		console.log('This is not Azure, use classic mechanism.');
+		console.log('Redis is not configured. Use local logic.');
+		console.log(process.env);
 	}
 };
