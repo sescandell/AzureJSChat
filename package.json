@@ -18,11 +18,12 @@
   ],
   "license": "MIT",
   "dependencies": {
-    "azure": "^0.9.11",
+    "azure": "~0.10.5",
     "ejs": "~0.8.5",
     "express": "~3.5.0",
     "gravatar": "~1.0.6",
     "socket.io": "~1.0.2",
-    "socket.io-adapter": "^0.3.0"
+    "socket.io-adapter": "^0.3.0",
+    "msgpack-js": "0.3.0"
   }
 }

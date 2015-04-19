@@ -18,11 +18,13 @@ module.exports = function(app, io){
 	app.use(express.static(__dirname + '/public'));
 
 	// Add azure adapter if required
-	if (false && process.env.hasOwnProperty('WEBSITE_INSTANCE_ID')) {
+	if (true || process.env.hasOwnProperty('WEBSITE_INSTANCE_ID')) {
 		console.log('Loading Azure adapter');
-		var azureAdapter = require(__dirname + '/lib/socketio-azuresb/index.js');
+		var azureAdapter = require(__dirname + '/libs/socketio-azure/index.js');
 		console.log('Attaching Azure adapter');
-		io.adapter(azureAdapter({subscriptionId: process.env.WEBSITE_INSTANCE_ID}));
+		io.adapter(azureAdapter({
+			subscriptionId: process.env.hasOwnProperty('WEBSITE_INSTANCE_ID') ? process.env.WEBSITE_INSTANCE_ID : undefined
+		}));
 	} else {
 		console.log('This is not Azure, use classic mechanism.');
 	}
